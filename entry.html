@@ -115,14 +115,10 @@
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script src="app.js"></script>
 <script>
-  showLoading();
-  initState().then(() => {
-    hideLoading();
-    document.getElementById('nav-root').innerHTML = navHTML();
-
   const params = new URLSearchParams(location.search);
   const id = params.get('id');
   if (!id) location.href = 'index.html';
@@ -141,7 +137,6 @@
     const s = getState();
     const cu = s.currentUser;
     const names = s.names;
-    const canEdit = true;
 
     const poster = e.poster
       ? `<img src="${e.poster}" class="detail-poster" alt="${e.title}">`
@@ -155,104 +150,55 @@
       const byStr = e.watchedBy ? `by <strong>${whoLabel(e.watchedBy)}</strong>` : '';
       let dateStr = '';
       if (e.type === 'series') {
-        const start = fmt(e.watchedDateStart);
-        const end   = fmt(e.watchedDate);
-        if (e.status === 'watching' && start && end) {
-          dateStr = `<span style="color:var(--text-dim);font-size:12px;margin:0 6px">·</span> Started <strong>${start}</strong> &nbsp;→&nbsp; Finished <strong>${end}</strong>`;
-        } else if (e.status === 'watching' && start) {
-          dateStr = `<span style="color:var(--text-dim);font-size:12px;margin:0 6px">·</span> Started <strong>${start}</strong>`;
-        } else if (start && end) {
-          dateStr = `<span style="color:var(--text-dim);font-size:12px;margin:0 6px">·</span> Started <strong>${start}</strong> &nbsp;→&nbsp; Finished <strong>${end}</strong>`;
-        } else if (end) {
-          dateStr = `<span style="color:var(--text-dim);font-size:12px;margin:0 6px">·</span> Finished <strong>${end}</strong>`;
-        } else if (start) {
-          dateStr = `<span style="color:var(--text-dim);font-size:12px;margin:0 6px">·</span> Started <strong>${start}</strong>`;
-        }
+        const start = fmt(e.watchedDateStart), end = fmt(e.watchedDate);
+        if (start && end) dateStr = `· Started <strong>${start}</strong> → Finished <strong>${end}</strong>`;
+        else if (start)   dateStr = `· Started <strong>${start}</strong>`;
+        else if (end)     dateStr = `· Finished <strong>${end}</strong>`;
       } else {
-        if (fmt(e.watchedDate)) dateStr = `<span style="color:var(--text-dim);font-size:12px;margin:0 6px">·</span> Watched on <strong>${fmt(e.watchedDate)}</strong>`;
+        if (fmt(e.watchedDate)) dateStr = `· Watched on <strong>${fmt(e.watchedDate)}</strong>`;
       }
-      if (byStr || dateStr) {
-        watchInfo = `<div class="watch-info-box">📅 ${byStr}${dateStr}</div>`;
-      }
+      if (byStr || dateStr) watchInfo = `<div class="watch-info-box">📅 ${byStr} ${dateStr}</div>`;
     }
 
-    // Ratings — always show both users as named cards
     const starLabels = ['','Terrible','Poor','Okay','Good','Great'];
     let ratingsHTML = `<div class="section-title">Ratings</div><div class="rating-cards">`;
     USERS.forEach(u => {
       const r = e.ratings && e.ratings[u];
-      const isMe = u === cu;
-      const canRate = isMe && e.status === 'watched';
-      const isCurrent = u === cu;
-
+      const canRate = u === cu && e.status === 'watched';
       let starsEl = '';
       if (canRate) {
         starsEl = `<div class="inline-stars" id="stars-${u}">`;
         for (let i = 1; i <= 5; i++) {
-          starsEl += `<span class="star ratingstar ${r >= i ? 'filled' : ''}"
-            onclick="quickRate(${i})"
-            onmouseover="hoverStars('stars-${u}',${i})"
-            onmouseout="resetStars('stars-${u}',${r || 0})">${r >= i ? '★' : '☆'}</span>`;
+          starsEl += `<span class="star ratingstar ${r >= i ? 'filled' : ''}" onclick="quickRate(${i})" onmouseover="hoverStars('stars-${u}',${i})" onmouseout="resetStars('stars-${u}',${r||0})">${r >= i ? '★' : '☆'}</span>`;
         }
-        starsEl += `</div>`;
-        starsEl += `<div class="rating-sublabel">${r ? starLabels[r] + ' · click to change' : 'click stars to rate'}</div>`;
+        starsEl += `</div><div class="rating-sublabel">${r ? starLabels[r] + ' · click to change' : 'click stars to rate'}</div>`;
+      } else if (r) {
+        starsEl = `<div class="inline-stars">${Array.from({length:5},(_,i)=>`<span class="star ratingstar ${r>=i+1?'filled':''}">${r>=i+1?'★':'☆'}</span>`).join('')}</div><div class="rating-sublabel">${starLabels[r]}</div>`;
       } else {
-        if (r) {
-          starsEl = `<div class="inline-stars">`;
-          for (let i = 1; i <= 5; i++) {
-            starsEl += `<span class="star ratingstar ${r >= i ? 'filled' : ''}">${r >= i ? '★' : '☆'}</span>`;
-          }
-          starsEl += `</div><div class="rating-sublabel">${starLabels[r]}</div>`;
-        } else {
-          starsEl = `<div class="rating-empty">Not rated yet</div>`;
-        }
+        starsEl = `<div class="rating-empty">Not rated yet</div>`;
       }
-
-      ratingsHTML += `<div class="rating-card ${isCurrent ? 'rating-card-mine' : ''}">
-        <div class="rating-card-name">${names[u]}${isCurrent ? ' <span class="you-tag">you</span>' : ''}</div>
-        ${starsEl}
-      </div>`;
+      ratingsHTML += `<div class="rating-card ${u===cu?'rating-card-mine':''}">
+        <div class="rating-card-name">${names[u]}${u===cu?' <span class="you-tag">you</span>':''}</div>
+        ${starsEl}</div>`;
     });
     ratingsHTML += `</div>`;
 
-    // Reviews
     let reviewsHTML = '';
-    const hasAnyReview = e.reviews && (e.reviews.me || e.reviews.her);
-    if (hasAnyReview) {
+    if (e.reviews && (e.reviews.me || e.reviews.her)) {
       reviewsHTML = `<div class="section-title">Reviews</div><div class="reviews-row">`;
       USERS.forEach(u => {
-        if (e.reviews && e.reviews[u]) {
-          reviewsHTML += `<div class="review-block">
-            <div class="reviewer">${names[u]}</div>
-            <p>${e.reviews[u].replace(/\n/g,'<br>')}</p>
-          </div>`;
-        }
+        if (e.reviews[u]) reviewsHTML += `<div class="review-block"><div class="reviewer">${names[u]}</div><p>${e.reviews[u].replace(/\n/g,'<br>')}</p></div>`;
       });
       reviewsHTML += `</div>`;
     }
 
-    // Controls
     let controls = `<div class="section-title">Actions</div><div class="actions-row">`;
-
-    if (e.status !== 'watching') {
-      controls += `<button class="btn btn-secondary btn-sm" onclick="openWatchingModal()">Mark as Watching</button>`;
-    }
-    if (e.status !== 'watched') {
-      controls += `<button class="btn btn-secondary btn-sm" onclick="openWatchedModal()">Mark as Watched</button>`;
-    }
-    if (e.status !== 'towatch') {
-      controls += `<button class="btn btn-secondary btn-sm" onclick="setStatus('towatch')">Move to To Watch</button>`;
-    }
-
-    if (e.status === 'watched') {
-      controls += `<button class="btn btn-secondary btn-sm" onclick="openReviewModal()">${e.reviews && e.reviews[cu] ? 'Edit My Review' : 'Write Review'}</button>`;
-    }
-
-    if (canEdit) {
-      controls += `<a href="add.html?edit=${e.id}" class="btn btn-secondary btn-sm">Edit Entry</a>`;
-      controls += `<button class="btn btn-danger btn-sm" onclick="openDeleteModal()">Delete</button>`;
-    }
-
+    if (e.status !== 'watching') controls += `<button class="btn btn-secondary btn-sm" onclick="openWatchingModal()">Mark as Watching</button>`;
+    if (e.status !== 'watched')  controls += `<button class="btn btn-secondary btn-sm" onclick="openWatchedModal()">Mark as Watched</button>`;
+    if (e.status !== 'towatch')  controls += `<button class="btn btn-secondary btn-sm" onclick="setEntryStatus('towatch')">Move to To Watch</button>`;
+    if (e.status === 'watched')  controls += `<button class="btn btn-secondary btn-sm" onclick="openReviewModal()">${e.reviews&&e.reviews[cu]?'Edit My Review':'Write Review'}</button>`;
+    controls += `<a href="add.html?edit=${e.id}" class="btn btn-secondary btn-sm">Edit Entry</a>`;
+    controls += `<button class="btn btn-danger btn-sm" onclick="openDeleteModal()">Delete</button>`;
     controls += `</div>`;
 
     document.getElementById('content').innerHTML = `
@@ -261,178 +207,96 @@
         <div>
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
             <span class="status-badge ${statusBadgeClass(e.status)}">${statusLabel(e.status)}</span>
-            <span style="font-size:12px;color:var(--text-dim);font-weight:600;text-transform:uppercase;letter-spacing:0.5px">${e.type === 'series' ? 'Series' : 'Movie'}</span>
+            <span style="font-size:12px;color:var(--text-dim);font-weight:600;text-transform:uppercase;letter-spacing:0.5px">${e.type==='series'?'Series':'Movie'}</span>
           </div>
           <div class="detail-title">${e.title}</div>
-          <div class="detail-meta">${[e.year, e.director].filter(Boolean).join(' · ')}</div>
-          ${e.description ? `<div class="detail-desc">${e.description}</div>` : ''}
+          <div class="detail-meta">${[e.year,e.director].filter(Boolean).join(' · ')}</div>
+          ${e.description?`<div class="detail-desc">${e.description}</div>`:''}
           <div style="margin-bottom:16px">${genreTags}</div>
-          ${watchInfo}
-          ${ratingsHTML}
-          ${reviewsHTML}
-          ${controls}
+          ${watchInfo}${ratingsHTML}${reviewsHTML}${controls}
         </div>
       </div>`;
   }
 
-  function setStatus(status) {
-    updateEntry(id, { status });
-    renderPage();
-  }
+  function setEntryStatus(status) { updateEntry(id,{status}).then(renderPage); }
 
-  function populateWhoSelect(selectId, currentVal) {
-    const names = getNames();
+  function populateWhoSelect(selectId, val) {
+    const n = getNames();
     const sel = document.getElementById(selectId);
-    sel.innerHTML = `
-      <option value="together">Together</option>
-      <option value="me">Just ${names.me}</option>
-      <option value="her">Just ${names.her}</option>`;
-    if (currentVal) sel.value = currentVal;
+    sel.innerHTML = `<option value="together">Together</option><option value="me">Just ${n.me}</option><option value="her">Just ${n.her}</option>`;
+    if (val) sel.value = val;
   }
 
   function openWatchingModal() {
-    const today = new Date().toISOString().split('T')[0];
-    const e = getEntry(id);
-    populateWhoSelect('m-watching-who', e.watchedBy || 'together');
-    document.getElementById('m-watching-start').value = e.watchedDateStart || today;
-    document.getElementById('m-watching-end').value = e.watchedDate || '';
+    const e = getEntry(id), today = new Date().toISOString().split('T')[0];
+    populateWhoSelect('m-watching-who', e.watchedBy||'together');
+    document.getElementById('m-watching-start').value = e.watchedDateStart||today;
+    document.getElementById('m-watching-end').value = e.watchedDate||'';
     document.getElementById('modal-watching').classList.remove('hidden');
   }
 
   function confirmWatching() {
     const endVal = document.getElementById('m-watching-end').value;
-    updateEntry(id, {
-      status: 'watching',
-      watchedBy: document.getElementById('m-watching-who').value,
-      watchedDateStart: document.getElementById('m-watching-start').value,
-      watchedDate: endVal || null,
-    });
-    closeModal('modal-watching');
-    renderPage();
+    updateEntry(id,{status:'watching',watchedBy:document.getElementById('m-watching-who').value,watchedDateStart:document.getElementById('m-watching-start').value,watchedDate:endVal||null})
+      .then(()=>{closeModal('modal-watching');renderPage();});
   }
 
   function openWatchedModal() {
-    const e = getEntry(id);
-    const today = new Date().toISOString().split('T')[0];
-    const isSeries = e && e.type === 'series';
-    populateWhoSelect('m-who', e.watchedBy || 'together');
-    document.getElementById('m-date-movie').classList.toggle('hidden', isSeries);
-    document.getElementById('m-date-series').classList.toggle('hidden', !isSeries);
-    if (isSeries) {
-      document.getElementById('m-date-start').value = e.watchedDateStart || today;
-      document.getElementById('m-date-end').value = e.watchedDate || today;
-    } else {
-      document.getElementById('m-date').value = e.watchedDate || today;
-    }
+    const e = getEntry(id), today = new Date().toISOString().split('T')[0];
+    const isSeries = e&&e.type==='series';
+    populateWhoSelect('m-who', e.watchedBy||'together');
+    document.getElementById('m-date-movie').classList.toggle('hidden',isSeries);
+    document.getElementById('m-date-series').classList.toggle('hidden',!isSeries);
+    if (isSeries) { document.getElementById('m-date-start').value=e.watchedDateStart||today; document.getElementById('m-date-end').value=e.watchedDate||today; }
+    else document.getElementById('m-date').value=e.watchedDate||today;
     document.getElementById('modal-watched').classList.remove('hidden');
   }
 
   function confirmWatched() {
-    const e = getEntry(id);
-    const isSeries = e && e.type === 'series';
-    updateEntry(id, {
-      status: 'watched',
-      watchedBy: document.getElementById('m-who').value,
-      watchedDate: isSeries ? document.getElementById('m-date-end').value : document.getElementById('m-date').value,
-      watchedDateStart: isSeries ? document.getElementById('m-date-start').value : null,
-    });
-    closeModal('modal-watched');
-    renderPage();
-  }
-
-  function openRateModal(current) {
-    pendingRating = current || 0;
-    renderModalStars();
-    document.getElementById('modal-rate').classList.remove('hidden');
-  }
-
-  function renderModalStars() {
-    const labels = ['','Terrible','Poor','Okay','Good','Great'];
-    const container = document.getElementById('modal-stars');
-    container.innerHTML = '';
-    for (let i = 1; i <= 5; i++) {
-      const span = document.createElement('span');
-      span.className = 'star interactive-star ' + (pendingRating >= i ? 'filled' : '');
-      span.textContent = pendingRating >= i ? '★' : '☆';
-      span.addEventListener('click', () => {
-        pendingRating = i;
-        renderModalStars();
-      });
-      container.appendChild(span);
-    }
-    document.getElementById('modal-star-label').textContent = labels[pendingRating] || 'Click to rate';
-  }
-
-  function confirmRate() {
-    if (!pendingRating) { alert('Please select a rating'); return; }
-    const e = getEntry(id);
-    const ratings = { ...(e.ratings || {}) };
-    ratings[getCurrentUser()] = pendingRating;
-    updateEntry(id, { ratings });
-    closeModal('modal-rate');
-    renderPage();
+    const e = getEntry(id), isSeries = e&&e.type==='series';
+    updateEntry(id,{status:'watched',watchedBy:document.getElementById('m-who').value,watchedDate:isSeries?document.getElementById('m-date-end').value:document.getElementById('m-date').value,watchedDateStart:isSeries?document.getElementById('m-date-start').value:null})
+      .then(()=>{closeModal('modal-watched');renderPage();});
   }
 
   function openReviewModal() {
     const e = getEntry(id);
-    document.getElementById('m-review').value = (e.reviews && e.reviews[getCurrentUser()]) || '';
+    document.getElementById('m-review').value=(e.reviews&&e.reviews[getCurrentUser()])||'';
     document.getElementById('modal-review').classList.remove('hidden');
   }
 
   function confirmReview() {
-    const text = document.getElementById('m-review').value.trim();
-    const e = getEntry(id);
-    const reviews = { ...(e.reviews || {}) };
-    reviews[getCurrentUser()] = text;
-    updateEntry(id, { reviews });
-    closeModal('modal-review');
-    renderPage();
+    const e = getEntry(id), reviews={...(e.reviews||{})};
+    reviews[getCurrentUser()] = document.getElementById('m-review').value.trim();
+    updateEntry(id,{reviews}).then(()=>{closeModal('modal-review');renderPage();});
   }
 
-  function openDeleteModal() {
-    document.getElementById('modal-delete').classList.remove('hidden');
-  }
-
-  function confirmDelete() {
-    deleteEntry(id);
-    location.href = 'index.html';
-  }
-
-  function closeModal(mid) {
-    document.getElementById(mid).classList.add('hidden');
-  }
-
-  // Close modals on overlay click
-  document.querySelectorAll('.modal-overlay').forEach(el => {
-    el.addEventListener('click', function(e) {
-      if (e.target === this) this.classList.add('hidden');
-    });
-  });
+  function openDeleteModal() { document.getElementById('modal-delete').classList.remove('hidden'); }
+  function confirmDelete() { deleteEntry(id).then(()=>location.href='index.html'); }
+  function closeModal(mid) { document.getElementById(mid).classList.add('hidden'); }
 
   function quickRate(val) {
-    const e = getEntry(id);
-    const ratings = { ...(e.ratings || {}) };
-    ratings[getCurrentUser()] = val;
-    updateEntry(id, { ratings });
+    const e=getEntry(id), ratings={...(e.ratings||{})};
+    ratings[getCurrentUser()]=val;
+    updateEntry(id,{ratings}).then(renderPage);
+  }
+
+  function hoverStars(cid,val) {
+    document.getElementById(cid).querySelectorAll('.star').forEach((s,i)=>{s.textContent=i<val?'★':'☆';s.classList.toggle('filled',i<val);});
+  }
+  function resetStars(cid,val) {
+    document.getElementById(cid).querySelectorAll('.star').forEach((s,i)=>{s.textContent=i<val?'★':'☆';s.classList.toggle('filled',i<val);});
+  }
+
+  document.querySelectorAll('.modal-overlay').forEach(el=>{
+    el.addEventListener('click',function(e){if(e.target===this)this.classList.add('hidden');});
+  });
+
+  showLoading();
+  initState().then(()=>{
+    hideLoading();
+    document.getElementById('nav-root').innerHTML = navHTML();
     renderPage();
-  }
-
-  function hoverStars(containerId, val) {
-    document.getElementById(containerId).querySelectorAll('.star').forEach((s, i) => {
-      s.textContent = i < val ? '★' : '☆';
-      s.classList.toggle('filled', i < val);
-    });
-  }
-
-  function resetStars(containerId, val) {
-    document.getElementById(containerId).querySelectorAll('.star').forEach((s, i) => {
-      s.textContent = i < val ? '★' : '☆';
-      s.classList.toggle('filled', i < val);
-    });
-  }
-
-  renderPage();
-  }); // end initState().then
+  });
 </script>
 </body>
 </html>

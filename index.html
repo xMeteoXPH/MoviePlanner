@@ -101,6 +101,14 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script src="app.js"></script>
 <script>
+  function closeModal(id) {
+    document.getElementById(id).classList.add('hidden');
+  }
+
+  document.getElementById('modal-random').addEventListener('click', function(e) {
+    if (e.target === this) this.classList.add('hidden');
+  });
+
   showLoading();
   initState().then(() => {
     hideLoading();
@@ -215,17 +223,11 @@
     }
   }
 
-  // ── Random Pick ──────────────────────────────────────────────────────────
   function randomPick() {
     const pool = getEntries().filter(e => e.status === 'towatch');
-    if (!pool.length) {
-      alert('Your To Watch list is empty — add some titles first!');
-      return;
-    }
+    if (!pool.length) { alert('Your To Watch list is empty — add some titles first!'); return; }
     const pick = pool[Math.floor(Math.random() * pool.length)];
-    const genres = (pick.genres || []).join(', ');
-    const meta = [pick.year, pick.type === 'series' ? 'Series' : 'Movie', genres].filter(Boolean).join(' · ');
-
+    const meta = [pick.year, pick.type==='series'?'Series':'Movie', (pick.genres||[]).join(', ')].filter(Boolean).join(' · ');
     document.getElementById('random-title').textContent = pick.title;
     document.getElementById('random-meta').textContent = meta;
     document.getElementById('random-poster-wrap').innerHTML = pick.poster
@@ -235,9 +237,7 @@
     document.getElementById('modal-random').classList.remove('hidden');
   }
 
-  function closeModal(id) {
-    document.getElementById(id).classList.add('hidden');
-  }
+  function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
 
   document.getElementById('modal-random').addEventListener('click', function(e) {
     if (e.target === this) this.classList.add('hidden');
