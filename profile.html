@@ -40,10 +40,18 @@
   <div id="tab-content"></div>
 </div>
 
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script src="app.js"></script>
 <script>
-  document.getElementById('nav-root').innerHTML = navHTML();
-  renderNavActive('profile');
+  showLoading();
+  initState().then(() => {
+    hideLoading();
+    document.getElementById('nav-root').innerHTML = navHTML();
+    renderNavActive('profile');
+    renderHeader();
+    renderTab();
+  });
 
   let currentTab = 'watched';
 
@@ -68,18 +76,20 @@
   function saveName() {
     const val = document.getElementById('name-input').value.trim();
     if (!val) return;
-    setName(getCurrentUser(), val);
-    renderHeader();
-    document.getElementById('nav-root').innerHTML = navHTML();
-    renderNavActive('profile');
+    setName(getCurrentUser(), val).then(() => {
+      renderHeader();
+      document.getElementById('nav-root').innerHTML = navHTML();
+      renderNavActive('profile');
+    });
   }
 
   function switchTo(u) {
-    setCurrentUser(u);
-    renderHeader();
-    renderTab();
-    document.getElementById('nav-root').innerHTML = navHTML();
-    renderNavActive('profile');
+    setCurrentUser(u).then(() => {
+      renderHeader();
+      renderTab();
+      document.getElementById('nav-root').innerHTML = navHTML();
+      renderNavActive('profile');
+    });
   }
 
   function switchTab(el) {
@@ -142,9 +152,6 @@
       </div>`;
     }).join('')}</div>`;
   }
-
-  renderHeader();
-  renderTab();
 </script>
 </body>
 </html>

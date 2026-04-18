@@ -106,122 +106,115 @@
   </form>
 </div>
 
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script src="app.js"></script>
 <script>
-  document.getElementById('nav-root').innerHTML = navHTML();
+  showLoading();
+  initState().then(() => {
+    hideLoading();
+    document.getElementById('nav-root').innerHTML = navHTML();
 
-  // Genre checkboxes
-  const gc = document.getElementById('genre-checks');
-  GENRES.forEach(g => {
-    const id = 'g-' + g;
-    gc.innerHTML += `<input type="checkbox" class="genre-check" id="${id}" value="${g}">
-      <label class="genre-check-label" for="${id}">${g}</label>`;
-  });
+    // Genre checkboxes
+    const gc = document.getElementById('genre-checks');
+    GENRES.forEach(g => {
+      const id = 'g-' + g;
+      gc.innerHTML += `<input type="checkbox" class="genre-check" id="${id}" value="${g}">
+        <label class="genre-check-label" for="${id}">${g}</label>`;
+    });
 
-  // Watched fields toggle — depends on both status and type
-  function updateWatchedFields() {
-    const status = document.getElementById('f-status').value;
-    const type = document.getElementById('f-type').value;
-    const isWatched = status === 'watched';
-    document.getElementById('watched-fields').classList.toggle('hidden', !isWatched);
-    if (isWatched) {
-      const isSeries = type === 'series';
-      document.getElementById('date-movie').classList.toggle('hidden', isSeries);
-      document.getElementById('date-series').classList.toggle('hidden', !isSeries);
-    }
-  }
-
-  document.getElementById('f-status').addEventListener('change', updateWatchedFields);
-  document.getElementById('f-type').addEventListener('change', updateWatchedFields);
-
-  // Poster upload
-  let posterData = null;
-  document.getElementById('f-poster').addEventListener('change', async function() {
-    const file = this.files[0];
-    if (!file) return;
-    try {
-      posterData = await imageToDataURL(file);
-      document.getElementById('upload-preview').innerHTML =
-        `<img src="${posterData}" style="max-height:120px;border-radius:4px;margin-bottom:6px"><div>Click to change</div>`;
-    } catch(e) {
-      alert(e);
-    }
-  });
-
-  // Edit mode
-  const params = new URLSearchParams(location.search);
-  const editId = params.get('edit');
-  let editEntry = null;
-
-  if (editId) {
-    editEntry = getEntry(editId);
-    if (!editEntry) { location.href = 'index.html'; }
-    else {
-      document.getElementById('page-title').textContent = 'Edit Title';
-      document.getElementById('submit-btn').textContent = 'Save Changes';
-      document.getElementById('f-title').value = editEntry.title || '';
-      document.getElementById('f-type').value = editEntry.type || 'movie';
-      document.getElementById('f-year').value = editEntry.year || '';
-      document.getElementById('f-director').value = editEntry.director || '';
-      document.getElementById('f-desc').value = editEntry.description || '';
-      document.getElementById('f-status').value = editEntry.status || 'towatch';
-      if (editEntry.status === 'watched') {
-        document.getElementById('watched-fields').classList.remove('hidden');
-        document.getElementById('f-who').value = editEntry.watchedBy || 'together';
-        if (editEntry.type === 'series') {
-          document.getElementById('date-series').classList.remove('hidden');
-          document.getElementById('date-movie').classList.add('hidden');
-          document.getElementById('f-date-start').value = editEntry.watchedDateStart || '';
-          document.getElementById('f-date-end').value = editEntry.watchedDate || '';
-        } else {
-          document.getElementById('f-date').value = editEntry.watchedDate || '';
-        }
+    function updateWatchedFields() {
+      const status = document.getElementById('f-status').value;
+      const type = document.getElementById('f-type').value;
+      const isWatched = status === 'watched';
+      document.getElementById('watched-fields').classList.toggle('hidden', !isWatched);
+      if (isWatched) {
+        const isSeries = type === 'series';
+        document.getElementById('date-movie').classList.toggle('hidden', isSeries);
+        document.getElementById('date-series').classList.toggle('hidden', !isSeries);
       }
-      (editEntry.genres || []).forEach(g => {
-        const el = document.getElementById('g-' + g);
-        if (el) el.checked = true;
-      });
-      if (editEntry.poster) {
-        posterData = editEntry.poster;
+    }
+
+    document.getElementById('f-status').addEventListener('change', updateWatchedFields);
+    document.getElementById('f-type').addEventListener('change', updateWatchedFields);
+
+    let posterData = null;
+    document.getElementById('f-poster').addEventListener('change', async function() {
+      const file = this.files[0];
+      if (!file) return;
+      try {
+        posterData = await imageToDataURL(file);
         document.getElementById('upload-preview').innerHTML =
           `<img src="${posterData}" style="max-height:120px;border-radius:4px;margin-bottom:6px"><div>Click to change</div>`;
+      } catch(e) { alert(e); }
+    });
+
+    const params = new URLSearchParams(location.search);
+    const editId = params.get('edit');
+    let editEntry = null;
+
+    if (editId) {
+      editEntry = getEntry(editId);
+      if (!editEntry) { location.href = 'index.html'; }
+      else {
+        document.getElementById('page-title').textContent = 'Edit Title';
+        document.getElementById('submit-btn').textContent = 'Save Changes';
+        document.getElementById('f-title').value = editEntry.title || '';
+        document.getElementById('f-type').value = editEntry.type || 'movie';
+        document.getElementById('f-year').value = editEntry.year || '';
+        document.getElementById('f-director').value = editEntry.director || '';
+        document.getElementById('f-desc').value = editEntry.description || '';
+        document.getElementById('f-status').value = editEntry.status || 'towatch';
+        if (editEntry.status === 'watched') {
+          document.getElementById('watched-fields').classList.remove('hidden');
+          document.getElementById('f-who').value = editEntry.watchedBy || 'together';
+          if (editEntry.type === 'series') {
+            document.getElementById('date-series').classList.remove('hidden');
+            document.getElementById('date-movie').classList.add('hidden');
+            document.getElementById('f-date-start').value = editEntry.watchedDateStart || '';
+            document.getElementById('f-date-end').value = editEntry.watchedDate || '';
+          } else {
+            document.getElementById('f-date').value = editEntry.watchedDate || '';
+          }
+        }
+        (editEntry.genres || []).forEach(g => {
+          const el = document.getElementById('g-' + g);
+          if (el) el.checked = true;
+        });
+        if (editEntry.poster) {
+          posterData = editEntry.poster;
+          document.getElementById('upload-preview').innerHTML =
+            `<img src="${posterData}" style="max-height:120px;border-radius:4px;margin-bottom:6px"><div>Click to change</div>`;
+        }
       }
     }
-  }
 
-  document.getElementById('entry-form').addEventListener('submit', function(e) {
-    e.preventDefault();
-    const status = document.getElementById('f-status').value;
-    const genres = [...document.querySelectorAll('.genre-check:checked')].map(c => c.value);
-
-    const isSeries = document.getElementById('f-type').value === 'series';
-    const data = {
-      title: document.getElementById('f-title').value.trim(),
-      type: document.getElementById('f-type').value,
-      year: document.getElementById('f-year').value || '',
-      director: document.getElementById('f-director').value.trim(),
-      description: document.getElementById('f-desc').value.trim(),
-      genres,
-      status,
-      poster: posterData,
-      watchedBy: status === 'watched' ? document.getElementById('f-who').value : null,
-      watchedDate: status === 'watched'
-        ? (isSeries ? document.getElementById('f-date-end').value : document.getElementById('f-date').value)
-        : null,
-      watchedDateStart: status === 'watched' && isSeries
-        ? document.getElementById('f-date-start').value
-        : null,
-    };
-
-    if (!data.title) { alert('Title is required'); return; }
-
-    if (editId && editEntry) {
-      updateEntry(editId, data);
-      location.href = 'entry.html?id=' + editId;
-    } else {
-      const id = addEntry(data);
-      location.href = 'entry.html?id=' + id;
-    }
+    document.getElementById('entry-form').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const status = document.getElementById('f-status').value;
+      const genres = [...document.querySelectorAll('.genre-check:checked')].map(c => c.value);
+      const isSeries = document.getElementById('f-type').value === 'series';
+      const data = {
+        title: document.getElementById('f-title').value.trim(),
+        type: document.getElementById('f-type').value,
+        year: document.getElementById('f-year').value || '',
+        director: document.getElementById('f-director').value.trim(),
+        description: document.getElementById('f-desc').value.trim(),
+        genres, status, poster: posterData,
+        watchedBy: status === 'watched' ? document.getElementById('f-who').value : null,
+        watchedDate: status === 'watched' ? (isSeries ? document.getElementById('f-date-end').value : document.getElementById('f-date').value) : null,
+        watchedDateStart: status === 'watched' && isSeries ? document.getElementById('f-date-start').value : null,
+      };
+      if (!data.title) { alert('Title is required'); return; }
+      showLoading();
+      if (editId && editEntry) {
+        await updateEntry(editId, data);
+        location.href = 'entry.html?id=' + editId;
+      } else {
+        const id = await addEntry(data);
+        location.href = 'entry.html?id=' + id;
+      }
+    });
   });
 </script>
 </body>

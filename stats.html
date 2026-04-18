@@ -16,10 +16,17 @@
   <div id="stats-content"></div>
 </div>
 
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script src="app.js"></script>
 <script>
-  document.getElementById('nav-root').innerHTML = navHTML();
-  renderNavActive('stats');
+  showLoading();
+  initState().then(() => {
+    hideLoading();
+    document.getElementById('nav-root').innerHTML = navHTML();
+    renderNavActive('stats');
+    render();
+  });
 
   function render() {
     const entries = getEntries();
@@ -142,8 +149,6 @@
       </div>` : ''}
     `;
   }
-
-  render();
 </script>
 </body>
 </html>

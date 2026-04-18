@@ -114,9 +114,14 @@
   </div>
 </div>
 
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script src="app.js"></script>
 <script>
-  document.getElementById('nav-root').innerHTML = navHTML();
+  showLoading();
+  initState().then(() => {
+    hideLoading();
+    document.getElementById('nav-root').innerHTML = navHTML();
 
   const params = new URLSearchParams(location.search);
   const id = params.get('id');
@@ -427,6 +432,7 @@
   }
 
   renderPage();
+  }); // end initState().then
 </script>
 </body>
 </html>
