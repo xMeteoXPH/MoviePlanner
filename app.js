@@ -73,6 +73,7 @@ function getNames()       { return getState().names; }
 function getCurrentUser() { return getState().currentUser; }
 
 async function setCurrentUser(u) { const s=getState(); s.currentUser=u; await _save(s); }
+function forceCurrentUser(u) { const s=getState(); s.currentUser=u; _state=s; localStorage.setItem('mpState',JSON.stringify(s)); }
 async function setName(user,name) { const s=getState(); s.names[user]=name; await _save(s); }
 
 async function addEntry(entry) {
@@ -146,8 +147,9 @@ function navHTML() {
 }
 async function switchUser() {
   const s = getState();
-  s.currentUser = s.currentUser === 'me' ? 'her' : 'me';
-  await _save(s);
+  const newUser = s.currentUser === 'me' ? 'her' : 'me';
+  forceCurrentUser(newUser);
+  await _save(getState());
   location.reload();
 }
 function imageToDataURL(file) {

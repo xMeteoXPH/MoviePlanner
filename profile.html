@@ -84,6 +84,7 @@
   }
 
   function switchTo(u) {
+    forceCurrentUser(u);
     setCurrentUser(u).then(() => {
       renderHeader();
       renderTab();
