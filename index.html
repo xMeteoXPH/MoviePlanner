@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Movie Planner</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="nav-root"></div>
+
+<div class="app-layout">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+
+    <!-- Quick Stats -->
+    <div class="sb-section">
+      <div class="sb-title">Quick Stats</div>
+      <div class="sb-stats" id="sb-stats"></div>
+    </div>
+
+    <!-- Random Pick -->
+    <div class="sb-section">
+      <div class="sb-title">Random Pick</div>
+      <div id="sb-random-result" class="sb-random-result hidden"></div>
+      <button class="btn btn-primary sb-random-btn" onclick="randomPick()">🎲 Pick Something</button>
+    </div>
+
+    <!-- Recently Watched -->
+    <div class="sb-section">
+      <div class="sb-title">Recently Watched</div>
+      <div id="sb-recent"></div>
+    </div>
+
+    <!-- Next Up -->
+    <div class="sb-section">
+      <div class="sb-title">Next Up</div>
+      <div class="sb-subtitle">First in your To Watch queue</div>
+      <div id="sb-nextup"></div>
+    </div>
+
+    <!-- Still Waiting -->
+    <div class="sb-section">
+      <div class="sb-title">Still Waiting</div>
+      <div class="sb-subtitle">Movies/series you might've forgotten about</div>
+      <div id="sb-waiting"></div>
+    </div>
+
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main-content">
+    <div class="page-header">
+      <h1 class="page-title">Our List</h1>
+      <a href="add.html" class="btn btn-primary">+ Add Title</a>
+    </div>
+
+    <div class="filters-bar">
+      <input type="text" id="search" placeholder="🔍  Search by title…">
+      <select id="filter-genre"><option value="">All Genres</option></select>
+      <select id="filter-type">
+        <option value="">Movies & Series</option>
+        <option value="movie">Movies</option>
+        <option value="series">Series</option>
+      </select>
+      <select id="filter-status">
+        <option value="">All Statuses</option>
+        <option value="watching">Watching</option>
+        <option value="towatch">To Watch</option>
+        <option value="watched">Watched</option>
+      </select>
+    </div>
+
+    <div id="groups"></div>
+    <div id="empty" class="empty-state hidden">
+      <div class="icon">🎬</div>
+      <p>No titles found. Add one!</p>
+    </div>
+  </main>
+
+</div>
+
+<!-- Random Pick Modal -->
+<div id="modal-random" class="modal-overlay hidden">
+  <div class="modal" style="max-width:360px;text-align:center">
+    <div style="font-size:36px;margin-bottom:12px">🎲</div>
+    <div class="modal-title" style="justify-content:center">Tonight's Pick</div>
+    <div id="random-poster-wrap" style="margin:0 auto 16px;width:120px"></div>
+    <div id="random-title" style="font-size:20px;font-weight:700;margin-bottom:6px;letter-spacing:-0.3px"></div>
+    <div id="random-meta" style="font-size:13px;color:var(--text-muted);margin-bottom:20px"></div>
+    <div style="display:flex;gap:10px;justify-content:center">
+      <button class="btn btn-secondary" onclick="closeModal('modal-random')">Maybe Later</button>
+      <button class="btn btn-primary" id="random-view-btn">View Entry</button>
+      <button class="btn btn-secondary" onclick="randomPick()">🎲 Reroll</button>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+<script>
+  document.getElementById('nav-root').innerHTML = navHTML();
+  renderNavActive('home');
+
+  // populate genre filter
+  const gSel = document.getElementById('filter-genre');
+  GENRES.forEach(g => {
+    const o = document.createElement('option');
+    o.value = g; o.textContent = g;
+    gSel.appendChild(o);
+  });
+
+  // ── Sidebar ──────────────────────────────────────────────────────────────
+
+  function renderSidebar() {
+    const entries = getEntries();
+    const names = getNames();
+    const now = Date.now();
+
+    // Quick Stats
+    const watched  = entries.filter(e => e.status === 'watched').length;
+    const watching = entries.filter(e => e.status === 'watching').length;
+    const towatch  = entries.filter(e => e.status === 'towatch').length;
+    document.getElementById('sb-stats').innerHTML = `
+      <div class="sb-stat"><span class="sb-stat-num label-watched">${watched}</span><span class="sb-stat-label">Watched</span></div>
+      <div class="sb-stat"><span class="sb-stat-num label-watching">${watching}</span><span class="sb-stat-label">Watching</span></div>
+      <div class="sb-stat"><span class="sb-stat-num label-towatch">${towatch}</span><span class="sb-stat-label">To Watch</span></div>`;
+
+    // Recently Watched — last 3
+    const recent = entries.filter(e => e.status === 'watched' && e.watchedDate)
+      .sort((a,b) => b.watchedDate.localeCompare(a.watchedDate))
+      .slice(0, 3);
+
+    if (!recent.length) {
+      document.getElementById('sb-recent').innerHTML = `<div class="sb-empty">Nothing watched yet.</div>`;
+    } else {
+      document.getElementById('sb-recent').innerHTML = recent.map(e => {
+        const fmt = d => new Date(d + 'T00:00:00').toLocaleDateString('en-US', {month:'short', day:'numeric'});
+        return `<div class="sb-item" onclick="location.href='entry.html?id=${e.id}'">
+          <div class="sb-item-poster">${e.poster ? `<img src="${e.poster}">` : '🎬'}</div>
+          <div class="sb-item-info">
+            <div class="sb-item-title">${e.title}</div>
+            <div class="sb-item-sub">${fmt(e.watchedDate)}</div>
+          </div>
+        </div>`;
+      }).join('');
+    }
+
+    // Next Up — first 3 from To Watch in order added
+    const nextUp = entries
+      .filter(e => e.status === 'towatch')
+      .sort((a, b) => a.id.localeCompare(b.id))
+      .slice(0, 3);
+
+    if (!nextUp.length) {
+      document.getElementById('sb-nextup').innerHTML = `<div class="sb-empty">Your queue is empty.</div>`;
+    } else {
+      document.getElementById('sb-nextup').innerHTML = nextUp.map((e, i) => `
+        <div class="sb-item" onclick="location.href='entry.html?id=${e.id}'">
+          <div class="sb-item-pos">${i + 1}</div>
+          <div class="sb-item-poster">${e.poster ? `<img src="${e.poster}">` : '🎬'}</div>
+          <div class="sb-item-info">
+            <div class="sb-item-title">${e.title}</div>
+            <div class="sb-item-sub">${e.type === 'series' ? 'Series' : 'Movie'}${e.year ? ' · ' + e.year : ''}</div>
+          </div>
+        </div>`).join('');
+    }
+
+    // Still Waiting — oldest towatch + watching stuck > 30 days
+    const msPerDay = 86400000;
+    const oldTowatch = entries
+      .filter(e => e.status === 'towatch')
+      .sort((a,b) => a.id.localeCompare(b.id)) // id is timestamp
+      .slice(0, 2);
+
+    const stuckWatching = entries.filter(e => {
+      if (e.status !== 'watching') return false;
+      const addedMs = parseInt(e.id);
+      return (now - addedMs) > 30 * msPerDay;
+    }).slice(0, 2);
+
+    const waiting = [...stuckWatching, ...oldTowatch].slice(0, 4);
+
+    if (!waiting.length) {
+      document.getElementById('sb-waiting').innerHTML = `<div class="sb-empty">You're all caught up!</div>`;
+    } else {
+      document.getElementById('sb-waiting').innerHTML = waiting.map(e => {
+        const addedMs = parseInt(e.id);
+        const days = Math.floor((now - addedMs) / msPerDay);
+        const timeStr = days < 7 ? `${days}d ago`
+          : days < 30 ? `${Math.floor(days/7)}w ago`
+          : `${Math.floor(days/30)}mo ago`;
+        const isStuck = e.status === 'watching';
+        const hint = isStuck
+          ? `<span class="sb-waiting-tag stuck">Still watching?</span>`
+          : `<span class="sb-waiting-tag">Added ${timeStr}</span>`;
+        return `<div class="sb-item" onclick="location.href='entry.html?id=${e.id}'">
+          <div class="sb-item-poster">${e.poster ? `<img src="${e.poster}">` : '🎬'}</div>
+          <div class="sb-item-info">
+            <div class="sb-item-title">${e.title}</div>
+            <div class="sb-item-sub">${hint}</div>
+          </div>
+        </div>`;
+      }).join('');
+    }
+  }
+
+  // ── Random Pick ──────────────────────────────────────────────────────────
+  function randomPick() {
+    const pool = getEntries().filter(e => e.status === 'towatch');
+    if (!pool.length) {
+      alert('Your To Watch list is empty — add some titles first!');
+      return;
+    }
+    const pick = pool[Math.floor(Math.random() * pool.length)];
+    const genres = (pick.genres || []).join(', ');
+    const meta = [pick.year, pick.type === 'series' ? 'Series' : 'Movie', genres].filter(Boolean).join(' · ');
+
+    document.getElementById('random-title').textContent = pick.title;
+    document.getElementById('random-meta').textContent = meta;
+    document.getElementById('random-poster-wrap').innerHTML = pick.poster
+      ? `<img src="${pick.poster}" style="width:120px;border-radius:10px;border:1px solid var(--border-light)">`
+      : `<div style="width:120px;height:180px;background:var(--surface2);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:36px">🎬</div>`;
+    document.getElementById('random-view-btn').onclick = () => location.href = 'entry.html?id=' + pick.id;
+    document.getElementById('modal-random').classList.remove('hidden');
+  }
+
+  function closeModal(id) {
+    document.getElementById(id).classList.add('hidden');
+  }
+
+  document.getElementById('modal-random').addEventListener('click', function(e) {
+    if (e.target === this) this.classList.add('hidden');
+  });
+
+  // ── Main Grid ────────────────────────────────────────────────────────────
+  function cardHTML(e) {
+    const names = getNames();
+    const poster = e.poster
+      ? `<img class="movie-card-poster" src="${e.poster}" alt="${e.title}">`
+      : `<div class="movie-card-poster-placeholder">🎬<span>No Poster</span></div>`;
+
+    let ratingLine = '';
+    const meR  = e.ratings && e.ratings.me;
+    const herR = e.ratings && e.ratings.her;
+    if (meR || herR) {
+      const parts = [];
+      if (meR)  parts.push(`<span class="card-rater"><span class="card-rater-name">${names.me}</span><span class="card-rater-stars">${'★'.repeat(meR)}</span></span>`);
+      if (herR) parts.push(`<span class="card-rater"><span class="card-rater-name">${names.her}</span><span class="card-rater-stars">${'★'.repeat(herR)}</span></span>`);
+      ratingLine = `<div class="card-ratings">${parts.join('')}</div>`;
+    }
+
+    let watchLine = '';
+    if (e.status === 'watched') {
+      const fmtShort = d => d ? new Date(d + 'T00:00:00').toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'}) : null;
+      let who = '';
+      if (e.watchedBy === 'together') who = '👫 Together';
+      else if (e.watchedBy === 'me')  who = '👤 ' + names.me;
+      else if (e.watchedBy === 'her') who = '👤 ' + names.her;
+      let dateStr = '';
+      if (e.type === 'series') {
+        const s = fmtShort(e.watchedDateStart), f = fmtShort(e.watchedDate);
+        if (s && f) dateStr = `${s} → ${f}`;
+        else if (f) dateStr = `Finished ${f}`;
+        else if (s) dateStr = `Started ${s}`;
+      } else {
+        const d = fmtShort(e.watchedDate);
+        if (d) dateStr = d;
+      }
+      const parts = [who, dateStr].filter(Boolean);
+      if (parts.length) watchLine = `<div class="card-watch-info">${parts.join('<span class="card-dot">·</span>')}</div>`;
+    } else if (e.status === 'watching') {
+      const fmtShort = d => d ? new Date(d + 'T00:00:00').toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'}) : null;
+      let who = '';
+      if (e.watchedBy === 'together') who = '👫 Together';
+      else if (e.watchedBy === 'me')  who = '👤 ' + names.me;
+      else if (e.watchedBy === 'her') who = '👤 ' + names.her;
+      const start = fmtShort(e.watchedDateStart);
+      const end   = fmtShort(e.watchedDate);
+      const dateStr = start ? `${start} → ${end || '???'}` : '';
+      const parts = [who, dateStr].filter(Boolean);
+      if (parts.length) watchLine = `<div class="card-watch-info">${parts.join('<span class="card-dot">·</span>')}</div>`;
+    }
+
+    const genreTag = (e.genres && e.genres[0]) ? `<span class="card-genre">${e.genres[0]}</span>` : '';
+
+    return `
+      <div class="movie-card" onclick="location.href='entry.html?id=${e.id}'">
+        <div class="movie-card-poster-wrap">
+          ${poster}
+          <div class="card-overlay">
+            <span class="card-type-pill">${e.type === 'series' ? 'Series' : 'Movie'}</span>
+          </div>
+        </div>
+        <div class="movie-card-body">
+          <div class="movie-card-title">${e.title}</div>
+          <div class="movie-card-meta">${[e.year, genreTag].filter(Boolean).join(' · ')}</div>
+          ${watchLine}
+          ${ratingLine}
+        </div>
+      </div>`;
+  }
+
+  function sectionHTML(label, entries, colorClass) {
+    if (!entries.length) return '';
+    return `
+      <div class="group-section">
+        <div class="group-header">
+          <span class="group-label ${colorClass}">${label}</span>
+          <span class="group-count">${entries.length}</span>
+          <div class="group-divider"></div>
+        </div>
+        <div class="movie-grid">${entries.map(cardHTML).join('')}</div>
+      </div>`;
+  }
+
+  function render() {
+    const search = document.getElementById('search').value.toLowerCase();
+    const genre  = document.getElementById('filter-genre').value;
+    const type   = document.getElementById('filter-type').value;
+    const status = document.getElementById('filter-status').value;
+
+    let all = getEntries().filter(e => {
+      if (search && !e.title.toLowerCase().includes(search)) return false;
+      if (genre  && !(e.genres || []).includes(genre)) return false;
+      if (type   && e.type !== type) return false;
+      if (status && e.status !== status) return false;
+      return true;
+    });
+
+    const groups = document.getElementById('groups');
+    const empty  = document.getElementById('empty');
+
+    if (!all.length) { groups.innerHTML = ''; empty.classList.remove('hidden'); return; }
+    empty.classList.add('hidden');
+
+    groups.innerHTML =
+      sectionHTML('Currently Watching', all.filter(e => e.status === 'watching'), 'label-watching') +
+      sectionHTML('To Watch',           all.filter(e => e.status === 'towatch'),  'label-towatch') +
+      sectionHTML('Watched',            all.filter(e => e.status === 'watched'),  'label-watched');
+  }
+
+  ['search','filter-genre','filter-type','filter-status'].forEach(id => {
+    document.getElementById(id).addEventListener('input', render);
+    document.getElementById(id).addEventListener('change', render);
+  });
+
+  renderSidebar();
+  render();
+</script>
+</body>
+</html>

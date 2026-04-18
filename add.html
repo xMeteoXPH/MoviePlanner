@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Add Title – Movie Planner</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="nav-root"></div>
+
+<div class="container" style="max-width:640px">
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px">
+    <a href="index.html" class="btn btn-secondary btn-sm">← Back</a>
+    <h1 id="page-title" style="font-size:20px;font-weight:700">Add Title</h1>
+  </div>
+
+  <form id="entry-form">
+    <div class="form-group">
+      <label>Title *</label>
+      <input type="text" id="f-title" required placeholder="e.g. Inception">
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div class="form-group">
+        <label>Type *</label>
+        <select id="f-type">
+          <option value="movie">Movie</option>
+          <option value="series">Series</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Release Year</label>
+        <input type="number" id="f-year" placeholder="2024" min="1888" max="2100">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>Director / Studio</label>
+      <input type="text" id="f-director" placeholder="e.g. Christopher Nolan">
+    </div>
+
+    <div class="form-group">
+      <label>Description</label>
+      <textarea id="f-desc" placeholder="Brief synopsis…"></textarea>
+    </div>
+
+    <div class="form-group">
+      <label>Genres</label>
+      <div class="genre-checks" id="genre-checks"></div>
+    </div>
+
+    <div class="form-group">
+      <label>Watch Status *</label>
+      <select id="f-status">
+        <option value="towatch">To Watch</option>
+        <option value="watching">Currently Watching</option>
+        <option value="watched">Watched</option>
+      </select>
+    </div>
+
+    <div id="watched-fields" class="hidden">
+      <div class="form-group">
+        <label>Watched By</label>
+        <select id="f-who">
+          <option value="together">Together</option>
+          <option value="me">Just Me</option>
+          <option value="her">Just Her</option>
+        </select>
+      </div>
+      <!-- Movie: single date -->
+      <div id="date-movie" style="display:grid;grid-template-columns:1fr;gap:16px">
+        <div class="form-group">
+          <label>Date Watched</label>
+          <input type="date" id="f-date">
+        </div>
+      </div>
+      <!-- Series: two dates -->
+      <div id="date-series" class="hidden" style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <div class="form-group">
+          <label>Date Started</label>
+          <input type="date" id="f-date-start">
+        </div>
+        <div class="form-group">
+          <label>Date Finished</label>
+          <input type="date" id="f-date-end">
+        </div>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>Poster Image (JPEG/PNG/WebP, max 10MB)</label>
+      <div class="file-upload-area" id="upload-area" onclick="document.getElementById('f-poster').click()">
+        <div id="upload-preview">
+          <div style="font-size:28px;margin-bottom:6px">🖼️</div>
+          <div>Click to upload poster</div>
+        </div>
+      </div>
+      <input type="file" id="f-poster" accept="image/jpeg,image/png,image/webp" class="hidden">
+    </div>
+
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <a href="index.html" class="btn btn-secondary">Cancel</a>
+      <button type="submit" class="btn btn-primary" id="submit-btn">Add Title</button>
+    </div>
+  </form>
+</div>
+
+<script src="app.js"></script>
+<script>
+  document.getElementById('nav-root').innerHTML = navHTML();
+
+  // Genre checkboxes
+  const gc = document.getElementById('genre-checks');
+  GENRES.forEach(g => {
+    const id = 'g-' + g;
+    gc.innerHTML += `<input type="checkbox" class="genre-check" id="${id}" value="${g}">
+      <label class="genre-check-label" for="${id}">${g}</label>`;
+  });
+
+  // Watched fields toggle — depends on both status and type
+  function updateWatchedFields() {
+    const status = document.getElementById('f-status').value;
+    const type = document.getElementById('f-type').value;
+    const isWatched = status === 'watched';
+    document.getElementById('watched-fields').classList.toggle('hidden', !isWatched);
+    if (isWatched) {
+      const isSeries = type === 'series';
+      document.getElementById('date-movie').classList.toggle('hidden', isSeries);
+      document.getElementById('date-series').classList.toggle('hidden', !isSeries);
+    }
+  }
+
+  document.getElementById('f-status').addEventListener('change', updateWatchedFields);
+  document.getElementById('f-type').addEventListener('change', updateWatchedFields);
+
+  // Poster upload
+  let posterData = null;
+  document.getElementById('f-poster').addEventListener('change', async function() {
+    const file = this.files[0];
+    if (!file) return;
+    try {
+      posterData = await imageToDataURL(file);
+      document.getElementById('upload-preview').innerHTML =
+        `<img src="${posterData}" style="max-height:120px;border-radius:4px;margin-bottom:6px"><div>Click to change</div>`;
+    } catch(e) {
+      alert(e);
+    }
+  });
+
+  // Edit mode
+  const params = new URLSearchParams(location.search);
+  const editId = params.get('edit');
+  let editEntry = null;
+
+  if (editId) {
+    editEntry = getEntry(editId);
+    if (!editEntry) { location.href = 'index.html'; }
+    else {
+      document.getElementById('page-title').textContent = 'Edit Title';
+      document.getElementById('submit-btn').textContent = 'Save Changes';
+      document.getElementById('f-title').value = editEntry.title || '';
+      document.getElementById('f-type').value = editEntry.type || 'movie';
+      document.getElementById('f-year').value = editEntry.year || '';
+      document.getElementById('f-director').value = editEntry.director || '';
+      document.getElementById('f-desc').value = editEntry.description || '';
+      document.getElementById('f-status').value = editEntry.status || 'towatch';
+      if (editEntry.status === 'watched') {
+        document.getElementById('watched-fields').classList.remove('hidden');
+        document.getElementById('f-who').value = editEntry.watchedBy || 'together';
+        if (editEntry.type === 'series') {
+          document.getElementById('date-series').classList.remove('hidden');
+          document.getElementById('date-movie').classList.add('hidden');
+          document.getElementById('f-date-start').value = editEntry.watchedDateStart || '';
+          document.getElementById('f-date-end').value = editEntry.watchedDate || '';
+        } else {
+          document.getElementById('f-date').value = editEntry.watchedDate || '';
+        }
+      }
+      (editEntry.genres || []).forEach(g => {
+        const el = document.getElementById('g-' + g);
+        if (el) el.checked = true;
+      });
+      if (editEntry.poster) {
+        posterData = editEntry.poster;
+        document.getElementById('upload-preview').innerHTML =
+          `<img src="${posterData}" style="max-height:120px;border-radius:4px;margin-bottom:6px"><div>Click to change</div>`;
+      }
+    }
+  }
+
+  document.getElementById('entry-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const status = document.getElementById('f-status').value;
+    const genres = [...document.querySelectorAll('.genre-check:checked')].map(c => c.value);
+
+    const isSeries = document.getElementById('f-type').value === 'series';
+    const data = {
+      title: document.getElementById('f-title').value.trim(),
+      type: document.getElementById('f-type').value,
+      year: document.getElementById('f-year').value || '',
+      director: document.getElementById('f-director').value.trim(),
+      description: document.getElementById('f-desc').value.trim(),
+      genres,
+      status,
+      poster: posterData,
+      watchedBy: status === 'watched' ? document.getElementById('f-who').value : null,
+      watchedDate: status === 'watched'
+        ? (isSeries ? document.getElementById('f-date-end').value : document.getElementById('f-date').value)
+        : null,
+      watchedDateStart: status === 'watched' && isSeries
+        ? document.getElementById('f-date-start').value
+        : null,
+    };
+
+    if (!data.title) { alert('Title is required'); return; }
+
+    if (editId && editEntry) {
+      updateEntry(editId, data);
+      location.href = 'entry.html?id=' + editId;
+    } else {
+      const id = addEntry(data);
+      location.href = 'entry.html?id=' + id;
+    }
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Profile – Movie Planner</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="nav-root"></div>
+
+<div class="container">
+  <div id="profile-header"></div>
+
+  <!-- Edit name -->
+  <div style="margin-bottom:28px">
+    <div style="font-size:13px;color:var(--text-muted);margin-bottom:8px">Display Name</div>
+    <div style="display:flex;gap:8px;max-width:320px">
+      <input type="text" id="name-input" placeholder="Your name">
+      <button class="btn btn-primary btn-sm" onclick="saveName()">Save</button>
+    </div>
+  </div>
+
+  <!-- Switch user -->
+  <div style="margin-bottom:28px">
+    <div style="font-size:13px;color:var(--text-muted);margin-bottom:8px">Viewing as</div>
+    <div style="display:flex;gap:8px">
+      <button id="btn-me" class="btn btn-sm" onclick="switchTo('me')">Me</button>
+      <button id="btn-her" class="btn btn-sm" onclick="switchTo('her')">Her</button>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" data-tab="watched" onclick="switchTab(this)">Watched</div>
+    <div class="tab" data-tab="watching" onclick="switchTab(this)">Watching</div>
+    <div class="tab" data-tab="towatch" onclick="switchTab(this)">To Watch</div>
+    <div class="tab" data-tab="ratings" onclick="switchTab(this)">Ratings & Reviews</div>
+  </div>
+
+  <div id="tab-content"></div>
+</div>
+
+<script src="app.js"></script>
+<script>
+  document.getElementById('nav-root').innerHTML = navHTML();
+  renderNavActive('profile');
+
+  let currentTab = 'watched';
+
+  function renderHeader() {
+    const s = getState();
+    const cu = s.currentUser;
+    const name = s.names[cu];
+    const initial = name.charAt(0).toUpperCase();
+    document.getElementById('profile-header').innerHTML = `
+      <div class="profile-header">
+        <div class="profile-avatar-lg">${initial}</div>
+        <div>
+          <div class="profile-name">${name}</div>
+          <div class="profile-sub">${cu === 'me' ? 'Primary user' : 'Secondary user'}</div>
+        </div>
+      </div>`;
+    document.getElementById('name-input').value = name;
+    document.getElementById('btn-me').className = 'btn btn-sm ' + (cu === 'me' ? 'btn-primary' : 'btn-secondary');
+    document.getElementById('btn-her').className = 'btn btn-sm ' + (cu === 'her' ? 'btn-primary' : 'btn-secondary');
+  }
+
+  function saveName() {
+    const val = document.getElementById('name-input').value.trim();
+    if (!val) return;
+    setName(getCurrentUser(), val);
+    renderHeader();
+    document.getElementById('nav-root').innerHTML = navHTML();
+    renderNavActive('profile');
+  }
+
+  function switchTo(u) {
+    setCurrentUser(u);
+    renderHeader();
+    renderTab();
+    document.getElementById('nav-root').innerHTML = navHTML();
+    renderNavActive('profile');
+  }
+
+  function switchTab(el) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+    currentTab = el.dataset.tab;
+    renderTab();
+  }
+
+  function renderTab() {
+    const cu = getCurrentUser();
+    const entries = getEntries();
+    const names = getNames();
+    const tc = document.getElementById('tab-content');
+
+    if (currentTab === 'ratings') {
+      const rated = entries.filter(e => e.ratings && e.ratings[cu]);
+      const reviewed = entries.filter(e => e.reviews && e.reviews[cu]);
+      if (!rated.length && !reviewed.length) {
+        tc.innerHTML = `<div class="empty-state"><div class="icon">⭐</div><p>No ratings or reviews yet.</p></div>`;
+        return;
+      }
+      let html = '';
+      if (rated.length) {
+        html += `<div class="section-title">Your Ratings</div>`;
+        html += rated.map(e => `
+          <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">
+            <a href="entry.html?id=${e.id}" style="flex:1;color:var(--text);text-decoration:none;font-size:14px">${e.title}</a>
+            <span style="color:var(--yellow)">${'★'.repeat(e.ratings[cu])}</span>
+          </div>`).join('');
+      }
+      if (reviewed.length) {
+        html += `<div class="section-title" style="margin-top:24px">Your Reviews</div>`;
+        html += reviewed.map(e => `
+          <div style="padding:12px 0;border-bottom:1px solid var(--border)">
+            <a href="entry.html?id=${e.id}" style="color:var(--accent-light);font-size:14px;font-weight:600">${e.title}</a>
+            <p style="color:var(--text-muted);font-size:13px;margin-top:6px;line-height:1.5">${e.reviews[cu]}</p>
+          </div>`).join('');
+      }
+      tc.innerHTML = html;
+      return;
+    }
+
+    const filtered = entries.filter(e => e.status === currentTab);
+    if (!filtered.length) {
+      tc.innerHTML = `<div class="empty-state"><div class="icon">🎬</div><p>Nothing here yet.</p></div>`;
+      return;
+    }
+
+    tc.innerHTML = `<div class="movie-grid">${filtered.map(e => {
+      const poster = e.poster
+        ? `<img class="movie-card-poster" src="${e.poster}" alt="${e.title}">`
+        : `<div class="movie-card-poster-placeholder">🎬</div>`;
+      return `<div class="movie-card" onclick="location.href='entry.html?id=${e.id}'">
+        ${poster}
+        <div class="movie-card-body">
+          <div class="movie-card-title">${e.title}</div>
+          <div class="movie-card-meta">${e.year || ''} · ${e.type === 'series' ? 'Series' : 'Movie'}</div>
+        </div>
+      </div>`;
+    }).join('')}</div>`;
+  }
+
+  renderHeader();
+  renderTab();
+</script>
+</body>
+</html>

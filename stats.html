@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stats – Movie Planner</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="nav-root"></div>
+
+<div class="container">
+  <div class="page-header">
+    <h1 class="page-title">Stats</h1>
+  </div>
+  <div id="stats-content"></div>
+</div>
+
+<script src="app.js"></script>
+<script>
+  document.getElementById('nav-root').innerHTML = navHTML();
+  renderNavActive('stats');
+
+  function render() {
+    const entries = getEntries();
+    const watched = entries.filter(e => e.status === 'watched');
+    const names = getNames();
+
+    if (!watched.length) {
+      document.getElementById('stats-content').innerHTML =
+        `<div class="empty-state"><div class="icon">📊</div><p>Watch some titles to see stats.</p></div>`;
+      return;
+    }
+
+    // Together vs solo
+    const together = watched.filter(e => e.watchedBy === 'together').length;
+    const justMe = watched.filter(e => e.watchedBy === 'me').length;
+    const justHer = watched.filter(e => e.watchedBy === 'her').length;
+
+    // Genre breakdown
+    const genreCount = {};
+    watched.forEach(e => (e.genres || []).forEach(g => { genreCount[g] = (genreCount[g] || 0) + 1; }));
+    const sortedGenres = Object.entries(genreCount).sort((a,b) => b[1]-a[1]);
+    const maxGenre = sortedGenres[0]?.[1] || 1;
+
+    // Rating distributions per user
+    function ratingDist(user) {
+      const dist = [0,0,0,0,0];
+      watched.forEach(e => { if (e.ratings && e.ratings[user]) dist[e.ratings[user]-1]++; });
+      return dist;
+    }
+
+    // Timeline: watched per month
+    const monthCount = {};
+    watched.forEach(e => {
+      if (e.watchedDate) {
+        const key = e.watchedDate.slice(0,7); // YYYY-MM
+        monthCount[key] = (monthCount[key] || 0) + 1;
+      }
+    });
+    const sortedMonths = Object.entries(monthCount).sort((a,b) => a[0].localeCompare(b[0]));
+    const maxMonth = sortedMonths[0] ? Math.max(...sortedMonths.map(m=>m[1])) : 1;
+
+    function barChart(rows, max) {
+      return rows.map(([label, count]) => `
+        <div class="chart-bar-row">
+          <div class="chart-bar-label">${label}</div>
+          <div class="chart-bar-track">
+            <div class="chart-bar-fill" style="width:${Math.round(count/max*100)}%"></div>
+          </div>
+          <div class="chart-bar-count">${count}</div>
+        </div>`).join('');
+    }
+
+    function ratingChart(user) {
+      const dist = ratingDist(user);
+      const max = Math.max(...dist, 1);
+      return [1,2,3,4,5].map(i => `
+        <div class="chart-bar-row">
+          <div class="chart-bar-label">${'★'.repeat(i)}</div>
+          <div class="chart-bar-track">
+            <div class="chart-bar-fill" style="width:${Math.round(dist[i-1]/max*100)}%"></div>
+          </div>
+          <div class="chart-bar-count">${dist[i-1]}</div>
+        </div>`).join('');
+    }
+
+    const monthLabel = key => {
+      const [y,m] = key.split('-');
+      return new Date(+y, +m-1).toLocaleDateString('en-US',{month:'short',year:'numeric'});
+    };
+
+    document.getElementById('stats-content').innerHTML = `
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-number">${watched.length}</div>
+          <div class="stat-label">Total Watched</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number">${together}</div>
+          <div class="stat-label">Watched Together</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number">${justMe}</div>
+          <div class="stat-label">Just ${names.me}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number">${justHer}</div>
+          <div class="stat-label">Just ${names.her}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number">${entries.filter(e=>e.status==='towatch').length}</div>
+          <div class="stat-label">To Watch</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number">${entries.filter(e=>e.status==='watching').length}</div>
+          <div class="stat-label">Currently Watching</div>
+        </div>
+      </div>
+
+      ${sortedGenres.length ? `
+      <div class="chart-section">
+        <div class="chart-section-title">Genre Breakdown</div>
+        ${barChart(sortedGenres, maxGenre)}
+      </div>` : ''}
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+        <div class="chart-section">
+          <div class="chart-section-title">${names.me}'s Ratings</div>
+          ${ratingChart('me')}
+        </div>
+        <div class="chart-section">
+          <div class="chart-section-title">${names.her}'s Ratings</div>
+          ${ratingChart('her')}
+        </div>
+      </div>
+
+      ${sortedMonths.length ? `
+      <div class="chart-section">
+        <div class="chart-section-title">Watched Per Month</div>
+        ${barChart(sortedMonths.map(([k,v]) => [monthLabel(k), v]), maxMonth)}
+      </div>` : ''}
+    `;
+  }
+
+  render();
+</script>
+</body>
+</html>
